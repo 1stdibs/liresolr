@@ -39,6 +39,29 @@
 
 package net.semanticmetadata.lire.solr.indexing;
 
+import java.awt.image.BufferedImage;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.Base64;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import javax.imageio.ImageIO;
+
+import net.semanticmetadata.lire.imageanalysis.features.FeatureRegistry;
 import net.semanticmetadata.lire.imageanalysis.features.GlobalFeature;
 import net.semanticmetadata.lire.imageanalysis.features.global.ColorLayout;
 import net.semanticmetadata.lire.imageanalysis.features.global.EdgeHistogram;
@@ -47,17 +70,8 @@ import net.semanticmetadata.lire.imageanalysis.features.global.PHOG;
 import net.semanticmetadata.lire.indexers.hashing.BitSampling;
 import net.semanticmetadata.lire.indexers.hashing.MetricSpaces;
 import net.semanticmetadata.lire.indexers.parallel.WorkItem;
-import net.semanticmetadata.lire.solr.FeatureRegistry;
 import net.semanticmetadata.lire.solr.HashingMetricSpacesManager;
 import net.semanticmetadata.lire.utils.ImageUtils;
-
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.*;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * This indexing application allows for parallel extraction of global features from multiple image files for
@@ -396,7 +410,8 @@ public class ParallelSolrIndexer implements Runnable {
     }
 
     class Monitoring implements Runnable {
-        public void run() {
+        @Override
+		public void run() {
             long ms = System.currentTimeMillis();
             try {
                 Thread.sleep(1000 * monitoringInterval); // wait xx seconds
@@ -417,7 +432,8 @@ public class ParallelSolrIndexer implements Runnable {
     }
 
     class Producer implements Runnable {
-        public void run() {
+        @Override
+		public void run() {
             try {
                 BufferedReader br = new BufferedReader(new FileReader(fileList));
                 String file = null;
@@ -468,7 +484,8 @@ public class ParallelSolrIndexer implements Runnable {
             addFeatures(features);
         }
 
-        public void run() {
+        @Override
+		public void run() {
             while (!locallyEnded) {
                 try {
                     // we wait for the stack to be either filled or empty & not being filled any more.
@@ -509,9 +526,9 @@ public class ParallelSolrIndexer implements Runnable {
                         else if (img.getWidth() < 32 || img.getHeight() < 32) { // image is too small to be worked with, for now I just do an upscale.
                             double scaleFactor = 128d;
                             if (img.getWidth() > img.getHeight()) {
-                                scaleFactor = (128d / (double) img.getWidth());
+                                scaleFactor = (128d / img.getWidth());
                             } else {
-                                scaleFactor = (128d / (double) img.getHeight());
+                                scaleFactor = (128d / img.getHeight());
                             }
                             img = ImageUtils.scaleImage(img, ((int) (scaleFactor * img.getWidth())), (int) (scaleFactor * img.getHeight()));
                         }
