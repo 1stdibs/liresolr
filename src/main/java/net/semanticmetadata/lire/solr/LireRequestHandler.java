@@ -519,39 +519,33 @@ public class LireRequestHandler extends RequestHandlerBase {
 
             //TODO - this seems to only add certain fields if they are requested. Probably should fix
             // add fields as requested:
-            if (req.getParams().get("fl") == null) {
-            	solrDocument.put("id", result.getDocument().get("id"));
-                if (result.getDocument().get("title") != null)
-                	solrDocument.put("title", result.getDocument().get("title"));
+            if (req.getParams().get("fl") == null || req.getParams().get("fl").equals("*")) {
+            	 // all fields
+                for (IndexableField field : result.getDocument().getFields()) {
+                    String tmpField = field.name();
+
+                    if (result.getDocument().getFields(tmpField).length > 1) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
+                    } else if (result.getDocument().getFields(tmpField).length > 0) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
+                    }
+                }
             } else {
                 String fieldsRequested = req.getParams().get("fl");
                 if (fieldsRequested.contains("score")) {
                 	solrDocument.put("score", result.getDistance());
                 }
-                if (fieldsRequested.contains("*")) {
-                    // all fields
-                    for (IndexableField field : result.getDocument().getFields()) {
-                        String tmpField = field.name();
-
-                        if (result.getDocument().getFields(tmpField).length > 1) {
-                        	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
-                        } else if (result.getDocument().getFields(tmpField).length > 0) {
-                        	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
-                        }
-                    }
-                } else {
-                    StringTokenizer st;
-                    if (fieldsRequested.contains(","))
-                        st = new StringTokenizer(fieldsRequested, ",");
-                    else
-                        st = new StringTokenizer(fieldsRequested, " ");
-                    while (st.hasMoreElements()) {
-                        String tmpField = st.nextToken();
-                        if (result.getDocument().getFields(tmpField).length > 1) {
-                        	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
-                        } else if (result.getDocument().getFields(tmpField).length > 0) {
-                        	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
-                        }
+                StringTokenizer st;
+                if (fieldsRequested.contains(","))
+                    st = new StringTokenizer(fieldsRequested, ",");
+                else
+                    st = new StringTokenizer(fieldsRequested, " ");
+                while (st.hasMoreElements()) {
+                    String tmpField = st.nextToken();
+                    if (result.getDocument().getFields(tmpField).length > 1) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
+                    } else if (result.getDocument().getFields(tmpField).length > 0) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
                     }
                 }
             }
