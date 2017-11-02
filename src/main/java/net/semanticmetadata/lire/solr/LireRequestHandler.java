@@ -77,6 +77,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
+import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.DocIterator;
 import org.apache.solr.search.DocList;
 import org.apache.solr.search.QParser;
@@ -479,7 +480,7 @@ public class LireRequestHandler extends RequestHandlerBase {
     private void doSearch(SolrQueryRequest req, SolrQueryResponse rsp, SolrIndexSearcher searcher, String hashFieldName,
                           int maximumHits, List<Query> filterQueries, Query query, GlobalFeature queryFeature)
             throws IOException, IllegalAccessException, InstantiationException {
-        // temp feature instance
+    	// temp feature instance
         GlobalFeature tmpFeature = queryFeature.getClass().newInstance();
         // Taking the time of search for statistical purposes.
         time = System.currentTimeMillis();
@@ -524,7 +525,9 @@ public class LireRequestHandler extends RequestHandlerBase {
                 for (IndexableField field : result.getDocument().getFields()) {
                     String tmpField = field.name();
 
-                    if (result.getDocument().getFields(tmpField).length > 1) {
+                    SchemaField schemaField = req.getSearcher().getSchema().getField(field.name());
+
+                    if (schemaField.multiValued()) {
                     	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
                     } else if (result.getDocument().getFields(tmpField).length > 0) {
                     	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
