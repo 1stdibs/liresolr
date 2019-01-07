@@ -39,20 +39,24 @@
 
 package net.semanticmetadata.lire.solr;
 
-import net.semanticmetadata.lire.imageanalysis.features.GlobalFeature;
-import net.semanticmetadata.lire.imageanalysis.features.global.ColorLayout;
-import net.semanticmetadata.lire.imageanalysis.features.global.EdgeHistogram;
-import org.apache.lucene.index.*;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Map;
+
+import org.apache.lucene.index.BinaryDocValues;
+import org.apache.lucene.index.DocValues;
+import org.apache.lucene.index.DocValuesType;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.function.FunctionValues;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.docvalues.DocTermsIndexDocValues;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRefBuilder;
-import org.apache.solr.common.util.Base64;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Map;
+import net.semanticmetadata.lire.imageanalysis.features.FeatureRegistry;
+import net.semanticmetadata.lire.imageanalysis.features.GlobalFeature;
+import net.semanticmetadata.lire.imageanalysis.features.global.ColorLayout;
 
 /**
  * A query function for sorting results based on the LIRE CBIR functions.
@@ -210,7 +214,8 @@ public class LireValueSource extends ValueSource {
                     return (float) doubleVal(doc);
                 }
 
-                public String strVal(int doc) {
+                @Override
+				public String strVal(int doc) {
                     final BytesRefBuilder bytes = new BytesRefBuilder();
                     return bytesVal(doc, bytes)
                             ? bytes.get().utf8ToString()
@@ -264,7 +269,8 @@ public class LireValueSource extends ValueSource {
                 }
 
 
-                public double doubleVal(int doc) {
+                @Override
+				public double doubleVal(int doc) {
                     return maxDistance;
                 }
             };

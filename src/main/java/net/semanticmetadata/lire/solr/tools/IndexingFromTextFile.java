@@ -1,20 +1,32 @@
 package net.semanticmetadata.lire.solr.tools;
 
-import net.semanticmetadata.lire.imageanalysis.features.GlobalFeature;
-import net.semanticmetadata.lire.indexers.hashing.BitSampling;
-import net.semanticmetadata.lire.indexers.hashing.MetricSpaces;
-import net.semanticmetadata.lire.indexers.tools.text.AbstractDocumentWriter;
-import net.semanticmetadata.lire.solr.FeatureRegistry;
-import net.semanticmetadata.lire.solr.HashingMetricSpacesManager;
-import net.semanticmetadata.lire.solr.indexing.ParallelSolrIndexer;
-import net.semanticmetadata.lire.utils.CommandLineUtils;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.ThresholdingOutputStream;
 
-import java.io.*;
-import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
+import net.semanticmetadata.lire.imageanalysis.features.FeatureRegistry;
+import net.semanticmetadata.lire.imageanalysis.features.GlobalFeature;
+import net.semanticmetadata.lire.indexers.hashing.BitSampling;
+import net.semanticmetadata.lire.indexers.hashing.MetricSpaces;
+import net.semanticmetadata.lire.indexers.tools.text.AbstractDocumentWriter;
+import net.semanticmetadata.lire.solr.HashingMetricSpacesManager;
+import net.semanticmetadata.lire.solr.indexing.ParallelSolrIndexer;
+import net.semanticmetadata.lire.utils.CommandLineUtils;
 
 /**
  * Reads a text file created by {@link net.semanticmetadata.lire.indexers.tools.text.ParallelExtraction} and creates
@@ -117,7 +129,7 @@ public class IndexingFromTextFile extends AbstractDocumentWriter {
         try {
             for (Iterator<GlobalFeature> iterator = a.iterator(); iterator.hasNext(); ) {
                 GlobalFeature f = iterator.next();
-                GlobalFeature n = (GlobalFeature) f.getClass().newInstance();
+                GlobalFeature n = f.getClass().newInstance();
                 n.setByteArrayRepresentation(f.getByteArrayRepresentation());
                 tmp.add(n);
             }

@@ -39,32 +39,58 @@
 
 package net.semanticmetadata.lire.solr;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.StringTokenizer;
+import java.util.TreeSet;
+
+import javax.imageio.ImageIO;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.BinaryDocValues;
+import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.MultiDocValues;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.util.BytesRef;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
+import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.util.NamedList;
+import org.apache.solr.handler.RequestHandlerBase;
+import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.response.SolrQueryResponse;
+import org.apache.solr.schema.SchemaField;
+import org.apache.solr.search.DocIterator;
+import org.apache.solr.search.DocList;
+import org.apache.solr.search.QParser;
+import org.apache.solr.search.SolrIndexSearcher;
+import org.apache.solr.search.SyntaxError;
+
+import net.semanticmetadata.lire.imageanalysis.features.FeatureRegistry;
 import net.semanticmetadata.lire.imageanalysis.features.GlobalFeature;
 import net.semanticmetadata.lire.imageanalysis.features.global.ColorLayout;
 import net.semanticmetadata.lire.indexers.hashing.BitSampling;
 import net.semanticmetadata.lire.indexers.hashing.MetricSpaces;
 import net.semanticmetadata.lire.utils.ImageUtils;
 import net.semanticmetadata.lire.utils.StatsUtils;
-import org.apache.commons.codec.binary.Base64;
-import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.index.*;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.*;
-import org.apache.lucene.util.BytesRef;
-import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.handler.RequestHandlerBase;
-import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.response.SolrQueryResponse;
-import org.apache.solr.search.*;
-
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.net.URL;
-import java.util.*;
 
 /**
  * This is the main LIRE RequestHandler for the Solr Plugin. It supports query by example using the indexed id,
@@ -454,7 +480,7 @@ public class LireRequestHandler extends RequestHandlerBase {
     private void doSearch(SolrQueryRequest req, SolrQueryResponse rsp, SolrIndexSearcher searcher, String hashFieldName,
                           int maximumHits, List<Query> filterQueries, Query query, GlobalFeature queryFeature)
             throws IOException, IllegalAccessException, InstantiationException {
-        // temp feature instance
+    	// temp feature instance
         GlobalFeature tmpFeature = queryFeature.getClass().newInstance();
         // Taking the time of search for statistical purposes.
         time = System.currentTimeMillis();
@@ -486,54 +512,58 @@ public class LireRequestHandler extends RequestHandlerBase {
         // Creating response ...
         time = System.currentTimeMillis() - time;
         rsp.add("ReRankSearchTime", time + "");
-        LinkedList list = new LinkedList();
+        LinkedList<SolrDocument> list = new LinkedList<>();
         for (Iterator<CachingSimpleResult> it = resultScoreDocs.iterator(); it.hasNext(); ) {
             CachingSimpleResult result = it.next();
-            HashMap m = new HashMap(2);
-            m.put("d", result.getDistance());
+            SolrDocument solrDocument = new SolrDocument();
+            solrDocument.put("d", result.getDistance());
+
+            //TODO - this seems to only add certain fields if they are requested. Probably should fix
             // add fields as requested:
-            if (req.getParams().get("fl") == null) {
-                m.put("id", result.getDocument().get("id"));
-                if (result.getDocument().get("title") != null)
-                    m.put("title", result.getDocument().get("title"));
+            if (req.getParams().get("fl") == null || req.getParams().get("fl").equals("*")) {
+            	 // all fields
+                for (IndexableField field : result.getDocument().getFields()) {
+                    String tmpField = field.name();
+
+                    SchemaField schemaField = req.getSearcher().getSchema().getField(field.name());
+
+                    if (schemaField.multiValued()) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
+                    } else if (result.getDocument().getFields(tmpField).length > 0) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
+                    }
+                }
             } else {
                 String fieldsRequested = req.getParams().get("fl");
                 if (fieldsRequested.contains("score")) {
-                    m.put("score", result.getDistance());
+                	solrDocument.put("score", result.getDistance());
                 }
-                if (fieldsRequested.contains("*")) {
-                    // all fields
-                    for (IndexableField field : result.getDocument().getFields()) {
-                        String tmpField = field.name();
-
-                        if (result.getDocument().getFields(tmpField).length > 1) {
-                            m.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
-                        } else if (result.getDocument().getFields(tmpField).length > 0) {
-                            m.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
-                        }
-                    }
-                } else {
-                    StringTokenizer st;
-                    if (fieldsRequested.contains(","))
-                        st = new StringTokenizer(fieldsRequested, ",");
-                    else
-                        st = new StringTokenizer(fieldsRequested, " ");
-                    while (st.hasMoreElements()) {
-                        String tmpField = st.nextToken();
-                        if (result.getDocument().getFields(tmpField).length > 1) {
-                            m.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
-                        } else if (result.getDocument().getFields(tmpField).length > 0) {
-                            m.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
-                        }
+                StringTokenizer st;
+                if (fieldsRequested.contains(","))
+                    st = new StringTokenizer(fieldsRequested, ",");
+                else
+                    st = new StringTokenizer(fieldsRequested, " ");
+                while (st.hasMoreElements()) {
+                    String tmpField = st.nextToken();
+                    if (result.getDocument().getFields(tmpField).length > 1) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getValues(tmpField));
+                    } else if (result.getDocument().getFields(tmpField).length > 0) {
+                    	solrDocument.put(result.getDocument().getFields(tmpField)[0].name(), result.getDocument().getFields(tmpField)[0].stringValue());
                     }
                 }
             }
 //            m.put(field, result.getDocument().get(field));
 //            m.put(field.replace("_ha", "_hi"), result.getDocument().getBinaryValue(field));
-            list.add(m);
+            list.add(solrDocument);
         }
-        rsp.add("docs", list);
-        // rsp.add("Test-name", "Test-val");
+
+        SolrDocumentList responseList = new SolrDocumentList();
+        responseList.addAll(list);
+        responseList.setNumFound(numberOfResults);
+        String start = req.getParams().get("start", "0");
+		responseList.setStart(Long.parseLong(start));
+
+        rsp.add("response", responseList);
     }
 
     private TreeSet<CachingSimpleResult> getReRankedResults(Iterator<Integer> docIterator, BinaryDocValues binaryValues, GlobalFeature queryFeature, GlobalFeature tmpFeature, int maximumHits, IndexSearcher searcher) throws IOException {
