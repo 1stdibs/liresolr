@@ -18,7 +18,7 @@
   <properties>
   	<lucene.version>6.4.0</lucene.version>
   	<solr.version>6.4.0</solr.version>
-  	<lire.version>0.9.4-SNAPSHOT</lire.version>
+  	<lire.version>0.9.4</lire.version>
   </properties>
 
   <dependencies>
